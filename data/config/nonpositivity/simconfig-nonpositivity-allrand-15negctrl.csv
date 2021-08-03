@@ -1,0 +1,17 @@
+flag                                                         , value
+sim_shortdesc                                                , nonpositivity-allrand
+seed_outcome_coef_rand                                       , TRUE
+n_sims                                                       , 500 
+n_obs_persim                                                 , 50000
+n_negctrls                                                   , 15
+num_not_trt_pri_outcome_mconfounder                          , 10
+use_outcome_model_coef_template_all_sims                     , FALSE
+outcome_model_coef_confounder_same_eff_all_outcomes_all_sims , FALSE
+same_all_measured_eff_to_all_outcomes_all_sim                , FALSE
+same_measured_eff_to_all_outcomes_per_sim_iter               , FALSE
+lackpositivity_sim_scenario                                  , TRUE
+lackpositivity_coef_inflation_fct                            , 1.20
+use_same_trtpos_deltavar_all_sim                             , FALSE
+gen_negctrls_with_trtpos                                     , TRUE
+nprocess                                                     , 4
+debug_intrpt                                                 , FALSE

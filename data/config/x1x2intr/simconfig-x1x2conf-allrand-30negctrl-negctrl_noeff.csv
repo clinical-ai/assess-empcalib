@@ -1,0 +1,16 @@
+flag                                                         , value
+sim_shortdesc                                                , twoconfoundersintr-allrand-negctrl_noeff
+seed_outcome_coef_rand                                       , TRUE
+n_sims                                                       , 500
+n_obs_persim                                                 , 50000
+n_negctrls                                                   , 30
+num_not_trt_pri_outcome_mconfounder                          , 10
+use_outcome_model_coef_template_all_sims                     , FALSE
+outcome_model_coef_confounder_same_eff_all_outcomes_all_sims , FALSE
+same_all_measured_eff_to_all_outcomes_all_sim                , FALSE
+same_measured_eff_to_all_outcomes_per_sim_iter               , FALSE
+intend_intr_twoconfounders_sim_scenario                      , TRUE
+gen_negctrls_with_x1x2                                       , FALSE
+use_same_x1x2_term_coef_all_sim                              , FALSE
+nprocess                                                     , 4
+debug_intrpt                                                 , FALSE
