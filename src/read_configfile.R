@@ -7,7 +7,7 @@ load_config <- function(csvconfigfile = NULL,
 
     if (is.null(csvconfigfile) | (0 == str_length(csvconfigfile))) { return (NULL) }
 
-    user_settings <- readr::read_csv(csvconfigfile)
+    user_settings <- read_csv(csvconfigfile)
     setting_col <- configcols[['setting_colname']]
     val_col <- configcols[['value_colname']]
 
