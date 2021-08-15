@@ -29,7 +29,6 @@ suppressPackageStartupMessages({
 source(here::here("src", "fn_prog_helpers.R"))
 source(here::here("src", "sim_datagen.R"))
 source(here::here("src", "sim_datagen_persim_outcomecoef.R"))
-# source(here::here("src", "sim_modelling.R"))
 source(here::here("src", "sim_binaryoutcome_utils.R"))
 source(here::here("src", "plot_funnel_est_coverage.R"))
 source(here::here("src", "plot_bias_boxplot-v2arch.R"))
@@ -43,28 +42,21 @@ source(here::here("src", "read_configfile.R"))
 
 args <- commandArgs(trailingOnly = TRUE)
 settings_file <- args[1]  # NA if not supplied.
-
-get_config <- NULL
-if (!is.na(settings_file)) {
-    print(glue("> DEBUG: Reading settings from `{settings_file}`"))
-    get_config <- load_config(csvconfigfile = settings_file,
-                              configcols = list(setting_colname = "flag", value_colname = "value"))
-
-} else if (is.na(settings_file)) {
-    settings_file <- here::here("data", "config",
-        "unmeasuredconf", "simconfig-unmeasuredconf-ideal-5negctrl.csv")
+if (is.na(settings_file)) {
+    settings_file <- here::here("data", "config", "unmeasuredconf",
+        "simconfig-unmeasuredconf-allrand-5negctrl.csv")
     print(glue("> DEBUG: Setting file not supplied. Reading DEFAULT from `{settings_file}`"))
-    get_config <- load_config(csvconfigfile = settings_file,
-                              configcols = list(setting_colname = "flag", value_colname = "value"))    
 }
+print(glue("> DEBUG: Reading settings from `{settings_file}`"))
+get_config <- load_config(csvconfigfile = settings_file,
+    configcols = list(setting_colname = "flag", value_colname = "value"))
 
-n_obs <- ifelse(!is.na(settings_file),
-                yes = get_config("n_obs_persim", default_val = 0L), no = 10000L) %>% as.integer()
+n_obs <- get_config("n_obs_persim", default_val = 10000) %>% as.integer()
 
 # n_sim ----
 n_sim <- ifelse(!is.na(settings_file),
                 yes = get_config("n_sims", default_val = 0L), no = 10L) %>% as.integer()
-parallelise_sim_threshold <- 10L
+parallelise_sim_threshold <- 20L
 
 # Interrupt exec flow at debug points, reduces the number of simulations
 # below `parallelise_sim_threshold`
@@ -74,10 +66,6 @@ debug_intrpt <- ifelse(!is.na(settings_file),
 if (debug_intrpt) { n_sim <- 1L }
 
 # Number of negative controls
-#num_negctrls_with_own_confounders <- 1L  # NegCtrl outcomes with their own associated confounders.
-#num_negctrls_wout_own_confounders <- 1L  # NegCtrl outcomes -without- their own associated confounders.
-#num_negctrls <- num_negctrls_with_own_confounders + num_negctrls_wout_own_confounders
-
 num_negctrls <- ifelse(!is.na(settings_file),
                        yes = get_config("n_negctrls", default_val = 5L),
                        no = 5L) %>% as.integer()
@@ -127,11 +115,7 @@ vstrong_trt_eff_loghr <- log(2.0)
 extreme_strong_trt_eff_loghr <- log(4.0)
 
 # Positive control trt effects ----
-# posctrl_log_or_targets <- c( log(1.5), log(2.0), log(4.0), log(6.0) )
-
-# ALL large positive controls , so systematic error model can be generated?
 posctrl_log_or_targets <- log( c(2.0, 4.0, 6.0))
-#posctrl_log_or_targets <- log( c(1.5, 2.0, 4.0))
 
 # Calibrates negative controls similar to Suchard, Schuemie, Lancet 2019
 calibrate_negctrls <- TRUE
@@ -153,33 +137,26 @@ set_value <- function(prop) {
 ## Flags for unmeasured confounding scenario ----
 
 ### Extra confounder, U, in study only?
-gen_extra_confounder_in_study <- set_binary_status(
-    ifelse(!is.na(settings_file),
-           yes = get_config("gen_extra_confounder_in_study", default_val = FALSE) %>% as.logical(),
-           no = FALSE))
+gen_extra_confounder_in_study <- get_config(
+    "gen_extra_confounder_in_study", default_val = FALSE) %>% as.logical()
+    
 ### Extra confounder, U, in negative controls?
-gen_extra_confounder_in_negctrl <- set_binary_status(
-    ifelse(!is.na(settings_file),
-           yes = get_config("gen_extra_confounder_in_negctrl", default_val = FALSE) %>% as.logical(),
-           no = FALSE))
+gen_extra_confounder_in_negctrl <- get_config(
+    "gen_extra_confounder_in_negctrl", default_val = FALSE) %>% as.logical()
 
 ### U term becomes unmeasured confounder in outcome of interest
-ignore_extra_confounder_in_study <- set_binary_status(
-    ifelse(!is.na(settings_file),
-           yes = get_config("ignore_extra_confounder_in_study", default_val = FALSE) %>% as.logical(),
-           no = FALSE))
+ignore_extra_confounder_in_study <- get_config(
+    "ignore_extra_confounder_in_study", default_val = FALSE) %>% as.logical()
 
 ### U term becomes unmeasured confounder in negative controls
-ignore_extra_confounder_in_negctrl <- set_binary_status(
-    ifelse(!is.na(settings_file),
-           yes = get_config("ignore_extra_confounder_in_negctrl", default_val = FALSE) %>% as.logical(),
-           no = FALSE))
+ignore_extra_confounder_in_negctrl <- get_config(
+    "ignore_extra_confounder_in_negctrl", default_val = FALSE) %>% as.logical()
 
 # Proportion of outcomes affected by this potential unmeasured confounder `U`
 prop_beta_u_with_effect <- 1.0
 
 sim_name_part <- paste(sim_name_part,
-                       ifelse(gen_extra_confounder_in_negctrl(),
+                       ifelse(gen_extra_confounder_in_negctrl,
                               yes = "nctrlcap_y", no = "nctrlcap_n"),
                        sep = "-")
 
@@ -187,7 +164,7 @@ negctrl_extra_confounder_coef_relative_outcome_interest <- set_binary_status(FAL
 
 static_extra_confounder_coef <- set_binary_status(FALSE)
 #sim_name_part <- paste(sim_name_part,
-#                       ifelse(gen_extra_confounder_in_negctrl(),
+#                       ifelse(gen_extra_confounder_in_negctrl,
 #                              yes = "static_u_y", no = "static_u_n-"),
 #                       sep = '-')
 
@@ -291,9 +268,9 @@ if (lackpositivity_coef_inflation_fct < 1.0) {
 }
 
 if (isTRUE(lackpositivity_sim_scenario)) {
-	gen_negctrls_with_trtpos <- ifelse(
-		!is.na(settings_file),
-		yes = get_config("gen_negctrls_with_trtpos", default_val = FALSE) %>% as.logical(),
+    gen_negctrls_with_trtpos <- ifelse(
+        !is.na(settings_file),
+        yes = get_config("gen_negctrls_with_trtpos", default_val = FALSE) %>% as.logical(),
         no = FALSE)
 }
 
@@ -323,17 +300,17 @@ merror_gaussian_mean <- NA_real_
 merror_gaussian_sd <- NA_real_
 
 if (isTRUE(measurement_err_confounder_scenario)) {
-	merror_coef_oddsratio_inflation_fct <- ifelse(
-			!is.na(settings_file),
-			yes = get_config("merror_coef_oddsratio_inflation_fct", default_val = FALSE) %>% as.numeric(),
-			no = 1.20) %>%
-		if_cond_do(condition = (lackpositivity_coef_inflation_fct < 1.0),
-			fun = { function(inflate_scale) {
-			    warning(glue(
+    merror_coef_oddsratio_inflation_fct <- ifelse(
+            !is.na(settings_file),
+            yes = get_config("merror_coef_oddsratio_inflation_fct", default_val = FALSE) %>% as.numeric(),
+            no = 1.20) %>%
+        if_cond_do(condition = (lackpositivity_coef_inflation_fct < 1.0),
+            fun = { function(inflate_scale) {
+                warning(glue(
                     "!! WARN: Measurement error inflation factor `merror_coef_oddsratio_inflation_fct` ",
-					"{signif(merror_coef_oddsratio_inflation_fct, 4)} is less than 1.0; will be set to 1.0"))
-				return(1.0)
-			} })
+                    "{signif(merror_coef_oddsratio_inflation_fct, 4)} is less than 1.0; will be set to 1.0"))
+                return(1.0)
+            } })
 }
 
 if (measurement_err_confounder_scenario & rand_merror_gaussian_params) {
@@ -358,10 +335,10 @@ if (measurement_err_confounder_scenario & rand_merror_gaussian_params) {
 
 if (measurement_err_confounder_scenario & !rand_merror_gaussian_params) {
     # Obtain non-randomised mean and standard error of error
-	merror_gaussian_mean <- ifelse(
-		!is.na(settings_file),
-		yes = get_config("merror_gaussian_mean", default_val = 0.0) %>% as.numeric(),
-		no = 0.0)
+    merror_gaussian_mean <- ifelse(
+        !is.na(settings_file),
+        yes = get_config("merror_gaussian_mean", default_val = 0.0) %>% as.numeric(),
+        no = 0.0)
     merror_gaussian_mean <- merror_gaussian_mean %>%
         if_cond_do(condition = merror_gaussian_mean < 0.0,
             fun = { function(inflate_scale) {
@@ -371,10 +348,10 @@ if (measurement_err_confounder_scenario & !rand_merror_gaussian_params) {
                 return(0.0)
             } })
 
-	merror_gaussian_sd <- ifelse(
-		!is.na(settings_file),
-		yes = get_config("merror_gaussian_sd", default_val = 1.0) %>% as.numeric(),
-		no = 1.0)
+    merror_gaussian_sd <- ifelse(
+        !is.na(settings_file),
+        yes = get_config("merror_gaussian_sd", default_val = 1.0) %>% as.numeric(),
+        no = 1.0)
     merror_gaussian_sd <- merror_gaussian_sd %>%
         if_cond_do(condition = (merror_gaussian_sd < 0.0),
             fun = { function(inflate_scale) {
@@ -389,8 +366,6 @@ if (measurement_err_confounder_scenario & !rand_merror_gaussian_params) {
 
 # beta_u_s , effect size for negative controls, is relative to beta_u from outcome of interest.
 
-#default_min_coef_odds_ratio <- 1.0
-#default_max_coef_odds_ratio <- 4.0
 
 static_extra_confounder_coef_all_sim_iters <- set_binary_status(FALSE)
 b_u_all_sim_iters <- NA_real_  # in log-odds scale.
@@ -399,17 +374,6 @@ if (static_extra_confounder_coef_all_sim_iters()) {
 }
 
 sim_name <- sim_name_part # The latest content becomes the simulation name.
-
-pkgs_dep <- c("dplyr", "tibble", "tidyselect", "vctrs", "purrr", "glue", "WeightIt", "EmpiricalCalibration")
-Sys.setenv(MKL_NUM_THREADS = 1) # MKL
-Sys.setenv(OMP_NUM_THREADS = 1) # OpenMP and MKL
-
-if (n_sim > parallelise_sim_threshold) {
-    cluster <- makeCluster(nprocesses)
-    registerDoParallel(cluster)
-} else {
-   registerDoSEQ()
-}
 
 ##
 # Generate the confounder specification ----------------------------------------
@@ -422,7 +386,7 @@ confounder_spec <- create_confounder_spec(n = num_notpriout_mconf + 1L,
 
 potential_unmeasured_confounder_varname <- paste0(get_extra_confounder_colname(), 1)
 
-if (gen_extra_confounder_in_study() | gen_extra_confounder_in_negctrl()) {
+if (gen_extra_confounder_in_study | gen_extra_confounder_in_negctrl) {
     # Generate values for potential unmeasured confounder
     print("> DEBUG: Adding spec. to generate potential unmeasured confounder U.")
     confounder_spec <- confounder_spec %>% add_one_confounder_spec(
@@ -544,7 +508,7 @@ print(glue("> DEBUG: Generating OUTCOME MODEL regression coefficients TEMPLATE f
     " with {num_negctrls} negative controls, and ",
     "{num_notpriout_mconf} independent fully measured confounders."))
 
-outcome_model_coef_prefix = "b"
+outcome_model_coef_prefix <- "b"
 
 # Initial template for outcome model, containing all NAs.
 outcome_model_coef_tbl_template <- gen_outcome_model_coef_template(
@@ -569,6 +533,24 @@ if (use_outcome_model_coef_template_all_sims) {
 
     }
 } # End `TRUE == use_outcome_model_coef_template_all_sims`
+
+# Init parameters
+same_all_measured_eff_to_all_outcomes_all_sim <- NA
+same_measured_eff_to_all_outcomes_per_sim_iter <- NA
+# Each simulation iteration generates its own outcome model
+if (FALSE == use_outcome_model_coef_template_all_sims) {
+    # In each simulation,
+    # coef. of ALL measured confounders, for ALL outcomes, are the same.
+    same_all_measured_eff_to_all_outcomes_all_sim <- get_config(
+     "same_all_measured_eff_to_all_outcomes_all_sim", default_val = FALSE) %>% as.logical()
+
+    # In each simulation,
+    # each measured confounders have the same effect size across all outcomes,
+    # BUT the coef. differ across confounders
+    # (unlike `same_all_measured_eff_to_all_outcomes_all_sim`)
+    same_measured_eff_to_all_outcomes_per_sim_iter <- get_config(
+        "same_measured_eff_to_all_outcomes_per_sim_iter", default_val = FALSE) %>% as.logical()
+}
 
 if (debug_intrpt) {
     print("> DEBUG: DataGen Outcome model template `outcome_model_coef_tbl_template`")
@@ -602,7 +584,7 @@ if (TRUE == outcome_model_coef_confounder_same_eff_all_outcomes_all_sims) {
 beta_u_range <- get_coef_range_or()
 
 if ( (TRUE == use_same_extra_term_coef_vec_all_sim) &
-     (gen_extra_confounder_in_study() | gen_extra_confounder_in_negctrl())) {
+     (gen_extra_confounder_in_study | gen_extra_confounder_in_negctrl)) {
     print("> DEBUG: Generating coefficient of U1 outside of simulation loop.")
 
     beta_u_vec_template <- rep(NA_real_, times = num_outcomes)
@@ -754,13 +736,13 @@ if (lackpositivity_sim_scenario) {
             rep(static_trtpos_deltavar_coef, times = length(coefvec))
         }}) %>%
         if_cond_do(!use_same_trtpos_deltavar_all_sim & !gen_negctrls_with_trtpos,
-			fun = { function(coefvec) {
-        		# Outcome of interest ONLY
-        		coefvec[[get_outcome_of_interest_study_num()]] <- log(
-        			runif(1, min = beta_trtpos_deltavar_range[['max_or']] - 0.01,
+            fun = { function(coefvec) {
+                # Outcome of interest ONLY
+                coefvec[[get_outcome_of_interest_study_num()]] <- log(
+                    runif(1, min = beta_trtpos_deltavar_range[['max_or']] - 0.01,
                              max = beta_trtpos_deltavar_range[['max_or']]) * lackpositivity_coef_inflation_fct)
                 return(coefvec)
-        	}
+            }
         }) %>%
         # Generate random inflated coef. in per-sim template
         if_cond_do(!use_same_trtpos_deltavar_all_sim & gen_negctrls_with_trtpos, fun = { function(coefvec) {
@@ -879,11 +861,23 @@ if (isTRUE(intr_conftrt_sim_scenario)) { # settings relevant to this scenario
 # Simulation starts ------------------------------------------------------------
 ##
 
+pkgs_dep <- c("dplyr", "tibble", "tidyselect", "vctrs", "purrr", "glue", "WeightIt", "EmpiricalCalibration")
+Sys.setenv(MKL_NUM_THREADS = 1) # MKL
+Sys.setenv(OMP_NUM_THREADS = 1) # OpenMP and MKL
+
+if (n_sim > parallelise_sim_threshold) {
+    cluster <- makeCluster(nprocesses)
+    registerDoParallel(cluster)
+} else {
+   registerDoSEQ()
+}
+
 print("> Running simulation")
 sim_start_time <- lubridate::now()
 print(sim_start_time)
 
-sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
+sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep,
+    .verbose = TRUE) %dopar% {
 
     sim_number <- i
 
@@ -1152,7 +1146,6 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     pscore_formula_rhs <- paste0(pscore_terms, collapse = "+")
     pscore_formula <- paste("Z", pscore_formula_rhs, sep = " ~ ")
     print(glue("> DEBUG: Sim #{sim_number}: Treatment model Calculating IPW weights {pscore_formula}"))
-    #pscores_obj <- weightit(as.formula(pscore_formula), data = trt_data, method = "ps")
     stablised_pscores_untrimmed_obj <- weightit(as.formula(pscore_formula), data = trt_data, method = "ps", stabilize = TRUE)
 
     # Trim weights at 99 quantile
@@ -1179,17 +1172,16 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     true_trt_eff_persim <- trt_eff
 
     # Init parameters
-    same_all_measured_eff_to_all_outcomes_all_sim <- NA
-    same_measured_eff_to_all_outcomes_per_sim_iter <- NA
+    #same_all_measured_eff_to_all_outcomes_all_sim <- NA
+    #same_measured_eff_to_all_outcomes_per_sim_iter <- NA
 
     # Each simulation iteration generates its own outcome model
     if (FALSE == use_outcome_model_coef_template_all_sims) {
 
         # In each simulation,
         # coef. of ALL measured confounders, for ALL outcomes, are the same.
-        same_all_measured_eff_to_all_outcomes_all_sim <- ifelse(!is.na(settings_file),
-            yes = get_config("same_all_measured_eff_to_all_outcomes_all_sim", default_val = FALSE) %>% as.logical(),
-            no = FALSE)
+        #same_all_measured_eff_to_all_outcomes_all_sim <- get_config(
+        # "same_all_measured_eff_to_all_outcomes_all_sim", default_val = FALSE) %>% as.logical()
         sim_output[['same_all_measured_eff_to_all_outcomes_all_sim']] <- same_all_measured_eff_to_all_outcomes_all_sim
 
         common_coef_all_confounders_all_outcomes <- log(
@@ -1201,9 +1193,8 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
         # each measured confounders have the same effect size across all outcomes,
         # BUT the coef. differ across confounders
         # (unlike `same_all_measured_eff_to_all_outcomes_all_sim`)
-        same_measured_eff_to_all_outcomes_per_sim_iter <- ifelse(!is.na(settings_file),
-            yes = get_config("same_measured_eff_to_all_outcomes_per_sim_iter", default_val = FALSE) %>% as.logical(),
-            no = FALSE)
+        #same_measured_eff_to_all_outcomes_per_sim_iter <- get_config(
+        #   "same_measured_eff_to_all_outcomes_per_sim_iter", default_val = FALSE) %>% as.logical()
         sim_output[['same_measured_eff_to_all_outcomes_per_sim_iter']] <- same_measured_eff_to_all_outcomes_per_sim_iter
 
         print(glue("> DEBUG: Sim #{sim_number}: Generating regression coefficients for MEASURED confounder X in OUTCOME MODEL."))
@@ -1293,7 +1284,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     ### DataGen PER sim Outcome model: Reg coef for potential unmeasured confounder U1 ---------
     ###
 
-    if (gen_extra_confounder_in_study() | gen_extra_confounder_in_negctrl()) {
+    if (gen_extra_confounder_in_study | gen_extra_confounder_in_negctrl) {
         # Generate coefficients for potential unmeasured confounder
 
         print(glue("> DEBUG: Sim #{sim_number}: Setting up regression coefficients for potential unmeasured confounder U in OUTCOME MODEL."))
@@ -1347,14 +1338,14 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
         } # if FALSE == use_same_extra_term_coef_vec_all_sim
 
         ## Outcome model: Negative controls are not affected by unmeasured confounder U
-        if (!gen_extra_confounder_in_negctrl()) {
+        if (!gen_extra_confounder_in_negctrl) {
             print(glue("> DEBUG: Sim #{sim_number} ",
-                       "`gen_extra_confounder_in_negctrl:` {gen_extra_confounder_in_negctrl()} ",
+                       "`gen_extra_confounder_in_negctrl:` {gen_extra_confounder_in_negctrl} ",
                        "Removing association between potential unmeasured confounder U and negative controls."))
 
             beta_u_vec[2:length(beta_u_vec)] <- 0.0
 
-        } # End if !gen_extra_confounder_in_negctrl()
+        } # End if !gen_extra_confounder_in_negctrl
 
         outcome_model_coef_tbl <- outcome_model_coef_tbl %>%
             mutate(!!potential_unmeasured_confounder_varname := beta_u_vec)
@@ -1458,12 +1449,12 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
             new_coef_max_or <- coef_max_or * lackpositivity_coef_inflation_fct
 
             if (gen_negctrls_with_trtpos) {
-				beta_xpostrt_vec <- log(
-					runif(length(beta_trtpos_deltavar_vec_template),
+                beta_xpostrt_vec <- log(
+                    runif(length(beta_trtpos_deltavar_vec_template),
                       min = new_coef_min_or, max = new_coef_max_or))
             } else {
-				beta_xpostrt_vec[[get_outcome_of_interest_study_num()]] <- log(
-					runif(1L, min = new_coef_min_or, max = new_coef_max_or))
+                beta_xpostrt_vec[[get_outcome_of_interest_study_num()]] <- log(
+                    runif(1L, min = new_coef_min_or, max = new_coef_max_or))
             }
 
         } else if (use_same_trtpos_deltavar_all_sim & same_measured_eff_to_all_outcomes_per_sim_iter) {
@@ -1563,15 +1554,15 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
 
     if (debug_intrpt) {
         print(glue("> DEBUG: Sim #{sim_number}: Final outcome model coef `outcome_model_coef_tbl`"))
-        TRUE %>% if_cond_do(condition = gen_extra_confounder_in_study(),
+        TRUE %>% if_cond_do(condition = gen_extra_confounder_in_study,
             fun = { function(cond) {
-                print(glue("> DEBUG: Sim #{sim_number}: `gen_extra_confounder_in_study` {gen_extra_confounder_in_study()}"))
+                print(glue("> DEBUG: Sim #{sim_number}: `gen_extra_confounder_in_study` {gen_extra_confounder_in_study}"))
                 return(TRUE)
                 }
             }) %>%
-        if_cond_do(condition = gen_extra_confounder_in_negctrl(),
+        if_cond_do(condition = gen_extra_confounder_in_negctrl,
             fun = { function(cond) {
-                print(glue("> DEBUG: Sim #{sim_number}: `gen_extra_confounder_in_negctrl` {gen_extra_confounder_in_negctrl()}"))
+                print(glue("> DEBUG: Sim #{sim_number}: `gen_extra_confounder_in_negctrl` {gen_extra_confounder_in_negctrl}"))
                 return(TRUE)
                 }
             }) %>%
@@ -1669,7 +1660,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
         print(glue("> DEBUG: Sim #{sim_number}: Treatment effect in first negative outcome {trt_coef_verified}"))
 
         ### Also check for zero association with potential unmeasured confounder U1
-        if (TRUE == gen_extra_confounder_in_negctrl()) {
+        if (TRUE == gen_extra_confounder_in_negctrl) {
             negctrl_outcome_u_verified <- verify_binary_outcome(data = negctrl_data_preproc,
                                                        trt_var = potential_unmeasured_confounder_varname,
                                                        out_var = get_outcome_colname(),
@@ -1691,7 +1682,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     print("> DEBUG: Preprocessing data to generate OBSERVED negative control")
 
     trt_data_for_negctrl <- trt_data
-    if (TRUE == ignore_extra_confounder_in_negctrl()) {
+    if (TRUE == ignore_extra_confounder_in_negctrl) {
         print(glue("> DEBUG: Sim #{sim_number}: Generating negative control data: removing `{potential_unmeasured_confounder_varname}`"))
         trt_data_for_negctrl <- trt_data_for_negctrl %>%
             select(-.data[[potential_unmeasured_confounder_varname]])
@@ -1728,12 +1719,6 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
                 }
             })
 
-    #if (TRUE == ignore_x1sqr_negctrl_model) {
-    #    print(glue("> DEBUG: Sim #{sim_number}: Generating negative control data: removing `{get_quadterm_colname()}`"))
-    #    trt_data_for_negctrl <- trt_data_for_negctrl %>%
-    #        select(-.data[[get_quadterm_colname()]])
-    #}
-
     negctrl_outcome_nums <- seq.int(from = 2L, to = num_negctrls + 1L)
     negctrl_data <- negctrl_outcome_nums %>% purrr::map_dfr(.f = create_negctrl_data,
                                                             negctrl_outcomes_mat = outcomes_mat,
@@ -1746,7 +1731,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
         print(negctrl_data) ;
 
         print(glue("> DEBUG: Sim #{sim_number}: ",
-            "`ignore_extra_confounder_in_negctrl` : {ignore_extra_confounder_in_negctrl()}"))
+            "`ignore_extra_confounder_in_negctrl` : {ignore_extra_confounder_in_negctrl}"))
         if (quad_term_sim_scenario) {
             print(glue("> DEBUG: Sim #{sim_number}: ",
                 "`ignore_x1sqr_negctrl_model` : {ignore_x1sqr_negctrl_model}"))
@@ -1918,23 +1903,6 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     postctrl_est_tbl <- postctrl_est_tbl %>%
         mutate(adj_true_trt_eff = postctrl_data %>% pull(trt_eff))
 
-
-
-    # Adjusting positive control estimates using estimate from negctrl-outcome
-    #print(glue("> DEBUG: Sim #{sim_number}: Adjusting positive control estimates."))
-    #
-    #negctrl_est <- negctrl_coef_est_tbl %>% purrr::pmap(.f = ~{
-    #    negctrl_est <- ..4
-    #    negctrl_trt_est <- negctrl_est %>%
-    #        filter(term == "Z") %>% pull(estimate)
-    #    return(list(res = rep(negctrl_trt_est, times = length(posctrl_log_or_targets))))
-    #}) %>% unlist()
-
-    # postctrl_est_tbl <- postctrl_est_tbl %>% mutate(negctrl_est = negctrl_est)
-    ## postctrl_est_tbl <- postctrl_est_tbl %>% mutate(adj_true_trt_eff = true_trt_eff  - negctrl_est)
-    # Assumes adjustment was performed already
-    #postctrl_est_tbl <- postctrl_est_tbl %>% mutate(adj_true_trt_eff = true_trt_eff)
-
     if (debug_intrpt) { print(postctrl_est_tbl) ; browser() }
 
     ##
@@ -2077,7 +2045,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
     print(glue("> DEBUG: Sim #{sim_number}: Estimating treatment effect for *outcome of interest*"))
 
     vars_to_remove_from_outcome_model <- c(get_outcome_colname()) %>%
-        if_cond_do(condition = ignore_extra_confounder_in_study(),
+        if_cond_do(condition = ignore_extra_confounder_in_study,
             fun = { function(vars_to_rm_vec) {
                 print(glue("> DEBUG: Sim #{sim_number}: Modelling ",
                     "outcome of interest: ignoring U"))
@@ -2093,7 +2061,7 @@ sim_out <- foreach(i = 1:n_sim, .packages = pkgs_dep) %dopar% {
         })
 
     vars_to_remove_from_trt_model <- c(get_trt_colname()) %>%
-            if_cond_do(condition = ignore_extra_confounder_in_study(),
+            if_cond_do(condition = ignore_extra_confounder_in_study,
             fun = { function(vars_to_rm_vec) {
                 print(glue("> DEBUG: Sim #{sim_number}: Modelling ",
                     "TREATMENT in primary outcome: removing U"))
@@ -2445,10 +2413,10 @@ num_outcomes <- num_negctrls + 1L # Plus one for outcome of interest
 sim_settings <- tribble(
     ~flags                              , ~persim_allsim_flags,           ~value,
     'all_sim_use_trt_model_template'    ,            'AllSims', all_sim_use_trt_model_template,
-    'gen_extra_confounder_in_study()'   ,            'AllSims', gen_extra_confounder_in_study(),
-    'gen_extra_confounder_in_negctrl()' ,            'AllSims', gen_extra_confounder_in_negctrl(),
-    'ignore_extra_confounder_in_study()',             'PerSim', ignore_extra_confounder_in_study(),
-    'ignore_extra_confounder_in_negctrl()',           'PerSim', ignore_extra_confounder_in_negctrl(),
+    'gen_extra_confounder_in_study'   ,            'AllSims', gen_extra_confounder_in_study,
+    'gen_extra_confounder_in_negctrl' ,            'AllSims', gen_extra_confounder_in_negctrl,
+    'ignore_extra_confounder_in_study',             'PerSim', ignore_extra_confounder_in_study,
+    'ignore_extra_confounder_in_negctrl',           'PerSim', ignore_extra_confounder_in_negctrl,
     'use_outcome_model_coef_template_all_sims',      'AllSims', use_outcome_model_coef_template_all_sims,
     'use_same_extra_term_coef_vec_all_sim',          'AllSims', use_same_extra_term_coef_vec_all_sim,
     'outcome_model_coef_confounder_same_eff_all_outcomes_all_sims', 'AllSims', outcome_model_coef_confounder_same_eff_all_outcomes_all_sims,
@@ -2585,17 +2553,6 @@ if (persist_sim_out_data) {
     print( glue("> DEBUG: Persiting reg coefs of OUTCOME models to `{outcome_model_coefs_file}`"))
     readr::write_csv(outcome_model_coefs %>% tidyr::unnest(res), outcome_model_coefs_file)
 
-    #primary_outcomde_data <- extract_tbl_from_sim_result(sim_res = sim_out, name = "primary_outcome_data")
-    #primary_outcome_data_file <- here::here("data", "sim-binaryoutcome",
-    #                                       glue("simres-{sim_complete_time_formatted}-primary_outcome_data-{sim_name}.csv.gz"))
-    #print("> DEBUG: Persisting *primary outcome* data to `{primary_outcome_data_file}`")
-    #readr::write_csv(primary_outcomde_data %>% tidyr::unnest(res), primary_outcome_data_file)
-
-    #negctrl_outcome_data <- extract_tbl_from_sim_result(sim_res = sim_out, name = "negctrl_data")
-    #negctrl_data_file <- here::here("data", "sim-binaryoutcome",
-    #                                        glue("simres-{sim_complete_time_formatted}-negctrl-{sim_name}.csv.gz"))
-    #print("> DEBUG: Persisting -negative control- data to `{negctrl_data_file}`")
-    #readr::write_csv(negctrl_outcome_data %>% tidyr::unnest(res) %>% unnest(negctrl_data), negctrl_data_file)
 }
 
 ##
@@ -2759,8 +2716,6 @@ adjtrue_posctrl_syserr_model <- extract_tbl_from_sim_result(
     sim_res = sim_out, name = "sys_err_model_adj_true_eff")
 allctrl_syserr_model <- extract_tbl_from_sim_result(
     sim_res = sim_out, name = "sys_err_allctrls")
-
-browser()
 
 #### Funnel plot of calibrated negative controls: Using neg ctrl only sys err model ----
 print("> DEBUG: Creating funnel plot of calibrated negative controls: Using neg ctrl only sys err model")
@@ -2951,15 +2906,6 @@ if(TRUE == calibrate_negctrls) {
                                  forest_plot_filename = glue("forest_plot-negctrl_calib_adjtruesyserr-{sim_complete_time_formatted}-{sim_name}.pdf"))
 
     if (debug_intrpt) { browser() }
-
-    # Combine data for a faceted plot
-    #calibrated_negctrl_est %>% filter(restype == "calibrated"), calibrated_negctrl_w_negctrl_only %>% filter(restype == "calibrated"))
-    #calibrated_negctrl_w_negctrl_only <- extract_tbl_from_sim_result(sim_res = sim_out, name = "calibrated_negctrl_est_negctrlonlysyserr") %>% tidyr::unnest(c(sim_num, res)) %>% mutate(calibtype = "negctrlonlysyerr")
-    #calibrated_negctrl_w_adjtrueposctrl <- extract_tbl_from_sim_result(sim_res = sim_out, name = "calibrated_negctrl_est_adjtruesyserr") %>% tidyr::unnest(c(sim_num, res)) %>% mutate(calibtype = "adjtruthposctrlsyserr")
-    #all_calibrated_negctrl_data <- rbind(calibrated_negctrl_est,
-    #    calibrated_negctrl_est, calibrated_negctrl_w_negctrl_only,
-    #    calibrated_negctrl_w_adjtrueposctrl )
-
 } # End (TRUE == calibrate_negctrls)
 
 if (TRUE == calibrate_posctrls & FALSE) {
