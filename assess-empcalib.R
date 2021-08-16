@@ -2439,6 +2439,18 @@ print(sim_settings)
 
 # Persisting data ----
 
+# Check and create required directories
+if (persist_sim_out_data) {
+  if (FALSE == dir.exists(here("data", "sim-binaryoutcome"))) {
+      dir.create(here("data", "sim-binaryoutcome"))
+  }  
+}
+if (persist_plots) {
+  if (FALSE == dir.exists(here("graphs"))) {
+      dir.create(here("graphs"))
+  }
+}
+
 if (persist_sim_out_data) {
     sim_settings_file <- here::here("data", "sim-binaryoutcome",
                                       glue("simres-{sim_complete_time_formatted}-settings-{sim_name}.csv"))
