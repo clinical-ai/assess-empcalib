@@ -159,11 +159,18 @@ plot_bias_v_estse_v2 <- function(combined_bias_est_data = NULL,
 #' @param max_se_limit_quantile_prob Max quantile cut off of standard error
 #'
 #' @return \code{ggplot} object with 95CI V-line
-decorate_funnel_plot_with_95ci_v <- function(funnelplot = NULL, plot_data = NULL,
+decorate_funnel_plot_with_95ci_v <- function(funnelplot = NULL,
+                                             plot_data = NULL, manual_max_se = NULL,
                                              max_se_limit_quantile_prob = 0.99) {
 
-    # Calculates required v-line data ----
-    max_se <- plot_data %>% pull(est_stderr) %>% quantile(probs = c(max_se_limit_quantile_prob)) %>% .[[1]]
+    if (is.null(manual_max_se)) {
+        if (is.null(plot_data)) { return(NULL) }
+        # Calculates required v-line data , taking into account specified quantile ----
+        max_se <- plot_data %>% pull(est_stderr) %>% quantile(probs = c(max_se_limit_quantile_prob)) %>% .[[1]]
+    } else {
+        # Uses user supplied level of maximum value of standard error, ignores plot data and quantiles.
+        max_se <- manual_max_se
+    }
 
     bias_centre_value = 0.0
     se_seq <- seq(from = 0.0, to = max_se, by = 0.01)
