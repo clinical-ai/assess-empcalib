@@ -2,6 +2,25 @@
 
 Please refer to our paper [Assessing the effectiveness of empirical calibration under different bias scenarios](https://arxiv.org/abs/2111.04233) for more details.
 
+## Installation
+
+1. Clone the repository
+2. Install R-tools
+3. Fetch and install the required R packages by restoring the renv project library
+   
+   The renv package (https://cran.r-project.org/web/packages/renv/index.html) is used to track R packages used in this project. To install the R packages used in the project, first install renv (if not already) by issuing the following command in R console
+   
+   ```R
+   install.packages("renv")
+   ```
+   The renv.lock file contains information on R packages to install. Issue the following command in R console, within the project’s directory to fetch and install the packages used in this project:
+   ```R
+   renv::restore() 
+   ```
+  
+   This may result in a message stating the ``project has not yet been activated``—answer `Y` (yes) to active the project. Also answer `Y` to proceed with fetching and installation.
+
+
 ## Main file
 
 `assess-empcalib.R`
