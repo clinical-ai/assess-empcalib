@@ -1,4 +1,4 @@
-# Assessing the effectiveness of empirical calibration under different bias scenarios
+# Assessing the effectiveness of empirical calibration
 
 Please refer to our paper [Assessing the effectiveness of empirical calibration under different bias scenarios](https://arxiv.org/abs/2111.04233) for more details.
 
@@ -21,25 +21,47 @@ Please refer to our paper [Assessing the effectiveness of empirical calibration 
    This may result in a message stating the ``project has not yet been activated``—answer `Y` (yes) to active the project. Also answer `Y` to proceed with fetching and installation.
 
 
-## Main file
+## Running the simulation
 
-`assess-empcalib.R`
+#### Command line
+
+To launch the simulation, run the script `assess-empcalib.R` with CSV parameter file as an argument. The CSV file contains parameters of the simulation. 
+
+```shell
+Rscript ./assess-empcalib.R ./data/config/unmeasuredconf/simconfig-unmeasuredconf-ideal-5negctrl.csv
+```
+
+#### Rstudio
+To run `assess-empcalib.R` from an integrated development environment (IDE)
+such as RStudio, assign the variable `settings_file` to the location of a
+configuration file.
+
+https://github.com/clinical-ai/assess-empcalib/blob/9f4c48fda13edc6a0019e635d838d54e6e06e5e4/assess-empcalib.R#L44
+
+#### Simulation parameters
 
 Configuration files in `data/config` define the simulation settings.
 The configuration file to use is specified when running
-`assess-empcalib.R` from the command line using `Rscript` e.g.,
-
-    Rscript ./assess-empcalib.R ./data/config/unmeasuredconf/simconfig-unmeasuredconf-ideal-5negctrl.csv
-
-The command line setup allows many simulations to be run in parallel on a batch processing
+`assess-empcalib.R` from the command line. The command line setup allows many simulations to be run in parallel on a batch processing
 system such as Portable Batch System (PBS).
+
+Some important parameters are described below:
+
+|     Parameter                                               |     Meaning                                                                                                                    |     Example value    |
+|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|----------------------|
+|     sim_shortdesc                                           |     Short text description of simulation.   Used to generate output directories.                                               |                      |
+|     seed_outcome_coef_rand                                  |     Whether to set a seed for R session.                                                                                       |     FALSE            |
+|     n_sims                                                  |     Number of simulations                                                                                                      |     500              |
+|     n_obs_persim                                            |     Number of observations per simulations                                                                                     |     50000            |
+|     n_negctrls                                              |     Number of negative controls                                                                                                |     15               |
+|     same_measured_eff_to_all_outcomes_per_sim_iter          |     Determines whether coefficients in model   should be all randomly generated (FALSE value) or same for all (ideal case).    |     TRUE             |
+|     nprocess                                                |     Number of CPU processes. The simulation   uses multiple processes, one process for a simulation.                           |     4                |
+
 
 If the configuration file is not supplied, the script defaults to the
 unmeasured confounder simulation scenario.
 
-To run `assess-empcalib.R` from an integrated development environment (IDE)
-such as RStudio, assign the variable `settings_file` to the location of a
-configuration file.
+## Results
 
 Initial results are stored under `data/sim-binaryoutcome` directory as
 CSV files. Plots generated during the simulation are stored under
@@ -53,7 +75,7 @@ However, it expects the results to be in a specific directory structure.
 Therefore, before collating the results and *after each* simulation, move the results files to the directory expected by the collation
 script.
 
-## Collating location of simulation results
+#### Collating location of simulation results
 
 The code in `gen-simres-paths-table.R` collects the locations of results of each simulation
 scenario into a CSV file. A specific simulation scenario can be specified by
@@ -82,7 +104,7 @@ For the example simulation, the recommendation is to create and move the simulat
 The collation process will create files under `data/resdata-paths/<YYYY-MM-DD>` , 
 which contain locations of the result files for plotting. 
 
-## Plotting
+#### Plots
 
 The `plot-bias_v_se-manual_yaxis_range.R` script generates the funnel plots from the manuscript). It allows the y-axis of plots in each simulation scenario to be specified so
 figures can be made consistent. It calls other functions to perform the actual plotting. By default, the plotting script expects the content of files from `gen-simres-paths-table.R` to be combined (e.g.,
@@ -95,7 +117,7 @@ Individual plots for each scenario can be plotted by changing the filtering para
 the combined file. Individual plots are placed inside cells of a template, `figures-template.svg`.
 This template can be open in drawing tools such as diagrams.net (formerly draw.io).
 
-## Calculating mean difference of average bias
+#### Calculating mean difference of average bias
 
 The script `calc_avgdiffabsbias.R` contains code that reads the collated simulation result
 file (generated by `gen-simres-paths-table.R`) and calculates the mean differences. As with plotting, this script expects all the collated results to be combined into one large file;
