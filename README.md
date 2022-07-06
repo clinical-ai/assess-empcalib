@@ -23,6 +23,8 @@ Please refer to our paper [Assessing the effectiveness of empirical calibration 
 
 ## Running the simulation
 
+<img src="simulation.png" width="700" height="700" />
+
 #### Command line
 
 To launch the simulation, run the script `assess-empcalib.R` with CSV parameter file as an argument. The CSV file contains parameters of the simulation. 
